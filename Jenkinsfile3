@@ -1,0 +1,164 @@
+pipeline {
+    agent any
+    environment {
+        scannerHome = tool name: 'sonar-scanner'
+        SONAR_TOKEN = credentials('SONAR_CLOUD_TOKEN')
+    }
+    stages {
+        stage('Obtener codigo') {
+            steps {
+                git branch: 'example-rafa', poll: false, url: 'https://github.com/RafaelRamos93/1640-LOCAL-ORDER-ADMI.git'
+            }
+        }
+        stage('Ejemplo de ejecucion en paralelo') {
+            parallel {
+                /*
+                stage('Scanner cobol') {
+                    steps {
+                        withSonarQubeEnv('sonar-scanner') {
+                            dir ('Codigo/Cobol') {
+                                sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.login=${SONAR_TOKEN} \
+                                -X
+                            """
+                            }
+                        }
+                        /*
+                        script {
+                            sh "echo 'ESPERAR QUALITY GATE DE COBOL'"
+                            def qgCobol = waitForQualityGate()
+                            if (qgCobol.status != 'OK') {
+                                error "Pipeline failed due to code quality issues; ${qgCobol.status}"
+                            }
+                        }
+                        
+                    }
+                }
+                */
+                /*
+                stage ('Quality Gate for Cobol') {
+                    steps {
+                        script {
+                            def qgCobol = waitForQualityGate()
+                            if (qgCobol.status != 'OK') {
+                                error "Pipeline failed due to code quality issues; ${qgCobol.status}"
+                            }
+                        }
+                    }
+                }
+                */
+                stage('Scanner C++') {
+                    steps {
+                        script {
+                            withSonarQubeEnv('sonar-scanner') {
+                                dir('Codigo/C++') {
+                                    sh 'pwd'
+                                    sh 'chmod +x ./compile.sh'
+                                    sh 'ls -a'
+                                    sh '$BUILD_WRAPPER/build-wrapper-linux-x86-64 --out-dir bw-output ./compile.sh'
+                                    sh """
+                                    ${scannerHome}/bin/sonar-scanner \
+                                    -Dsonar.login=${SONAR_TOKEN} \
+                                    -X
+                                """
+                                }
+                            }
+                        }
+                        /*
+                        script {
+                            sh "echo 'ESPERAR QUALITY GATE DE C++'"
+                            def qgCpp = waitForQualityGate()
+                            if (qgCpp.status != 'OK') {
+                                error "Pipeline failed due to code quality issues; ${qgCpp.status}"
+                            }
+                        }
+                        */
+                    }
+                }
+                /*
+                stage('Quality Gate for C++') {
+                    steps {
+                        script {
+                            def qgCpp = waitForQualityGate()
+                            if (qgCpp.status != 'OK') {
+                                error "Pipeline failed due to code quality issues; ${qgCpp.status}"
+                            }
+                        }
+                    }
+                }
+                */
+            }
+        }/*
+        stage('Quality Gate COBOL') {
+            steps {
+                script {
+                    timeout(time: 1, unit: 'HOURS') {
+                        def qgCobol = waitForQualityGate()
+                        if (qgCobol == null || qgCobol.status != 'NONE') {
+                            error "Pipeline interrumpido debido a que la Quality Gate de COBOL no se pudo determinar: ${qgCobol?.status}"
+                        } else if (qgCobol.status != 'OK') {
+                            error "Pipeline interrumpido debido a que la Quality Gate de COBOL falló: ${qgCobol.status}"
+                        }
+                    }
+                }
+            }
+        }*/
+        stage('Quality Gate C++') {
+            steps {
+                script {
+                    timeout(time: 1, unit: 'HOURS') {
+
+                        try {
+                            def qgCpp = waitForQualityGate()
+                            //echo "${?}"
+                            echo "-------------------- OBTENER VALORES DE VARIABLE-----------------------"
+                            echo "${qgCpp}"
+                            echo "-----------------------------------------------------------------------"
+                            qgCpp?.each{key, value -> echo  "${key}: ${value}"}
+                            echo "-----------------------------------------------------------------------"
+                        } catch (err) {
+                            echo err.getMessage();
+                        }
+                        /*
+                        if (qgCpp == null || qgCpp.status != 'NONE') {
+                            error "Pipeline interrumpido debido a que la Quality Gate de C++ no se pudo determinar: ${qgCpp?.status}"
+                        } else if (qgCpp.status != 'OK') {
+                            error "Pipeline interrumpido debido a que la Quality Gate de C++ falló: ${qgCpp.status}"
+                        }
+                        */
+                    }
+                }
+            }
+        }
+        stage('Post Parallel') {
+            steps {
+                echo "Se ejecuto parallel, y este es un mensaje sencillo"
+            }
+        }
+        /*
+        stage('Quality Gate') {
+            steps {
+                script {
+                    // Espera y obtiene el resultado de la Quality Gate de SonarCloud
+                    timeout(time: 1, unit: 'HOURS') { // Ajusta el tiempo de espera según sea necesario
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline interrumpido debido a que la Quality Gate de SonarCloud falló: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage("Quality Gate"){
+            timeout(time: 1, unit: 'HOURS') {
+                def qg = waitForQualityGate()
+                if (qg.status != 'OK') {
+                    error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                }
+            }
+        }
+        */
+    }
+}
