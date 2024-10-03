@@ -1,0 +1,5 @@
+Codigo/Cobol/.scannerwork/
+
+#Ignorar la carpeta .vscode y su contenido
+.vscode/
+.sonarlint/

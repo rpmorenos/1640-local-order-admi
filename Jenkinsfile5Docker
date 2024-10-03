@@ -1,0 +1,119 @@
+pipeline {
+    agent any
+    environment {
+        scannerHome = tool name: 'sonar-scanner'
+        SONAR_TOKEN = credentials('SONAR_CLOUD_TOKEN')
+        //SNYK_TOKEN = credentials('SNYK_TOKEN')
+        AUTHOR_NAME = ''
+        AUTHOR_EMAIL = ''
+        RECIPIENTS = 'facturas.rafael.ramos@gmail.com'
+        KICS_IMAGE = 'checkmarx/kics:latest'
+        WORKSPACE_DIR ='./Codigo/Cobol'
+
+    }
+    stages {
+        stage('Obtener Código Fuente') {
+            steps{
+                git branch: 'example-rafa', poll: false, url: 'https://github.com/RafaelRamos93/1640-LOCAL-ORDER-ADMI.git'
+                checkout scm
+            }
+        }
+        stage('Obtener GitCommiter') {
+            steps {
+                script {
+                    def committer = sh(script: "git log -1 --pretty=format:'%an <%ae>'", returnStdout: true).trim()
+                    echo "Commit realizado por: ${committer}"
+                    AUTHOR_NAME = sh(script: "git log -1 --pretty=format:'%an'", returnStdout: true).trim()
+                    AUTHOR_EMAIL = sh(script: "git log -1 --pretty=format:'%ae'", returnStdout: true).trim()
+                    echo "Nombre del autor: ${AUTHOR_NAME} < ${AUTHOR_EMAIL}"
+                }
+            }
+        }
+        stage('Run KICS') {
+            steps {
+                script {
+                    sh """docker run --rm -v ${WORKSPACE_DIR}:/project -v ${WORKSPACE}/kics-results:/results ${KICS_IMAGE} scan --path /project --output-path /results"""
+                }
+            }
+        }
+        stage('Parallel Scans') {
+            parallel {
+                stage('Cobol Scan') {
+                    steps {
+                        script {
+                            def cobolScanStatus = sonarScanCobol()
+                            if (cobolScanStatus != 'OK') {
+                                error("Quality Gate for Cobol did not pass")
+                            }
+                        }
+                    }
+                }
+                stage('C++ Scan') {
+                    steps {
+                        script {
+                            def cppScanStatus = sonarScanCpp()
+                            if (cppScanStatus != 'OK') {
+                                error("Quality Gate for C++ did not pass")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def sonarScanCobol() {
+    // Ejecuta el análisis de SonarCloud para Cobol
+    // Aquí puedes usar el comando SonarScanner o el SonarQube Scanner para Jenkins
+    // Ejemplo:
+    withSonarQubeEnv('sonar-scanner') {
+        dir ('Codigo/Cobol') {
+            sh """
+            ${scannerHome}/bin/sonar-scanner \
+            -Dsonar.login=${SONAR_TOKEN} \
+            -X
+            """
+        }
+    }
+    // Espera el resultado de SonarQube
+    timeout(time: 5, unit: 'MINUTES') {
+        waitForQualityGate(abortPipeline: false)
+    }
+
+    // Verifica el estado del Quality Gate
+    def qualityGateResult = waitForQualityGate()
+    return qualityGateResult.status == 'OK' ? 'OK' : 'FAILED'
+}
+
+def sonarScanCpp() {
+    // Ejecuta el análisis de SonarCloud para C++
+    withSonarQubeEnv('sonar-scanner') {
+        dir('Codigo/C++') {
+            sh 'pwd'
+            sh 'chmod +x ./compile.sh'
+            sh 'ls -a'
+            sh '$BUILD_WRAPPER/build-wrapper-linux-x86-64 --out-dir bw-output ./compile.sh'
+            sh """
+            ${scannerHome}/bin/sonar-scanner \
+            -Dsonar.login=${SONAR_TOKEN} \
+            -X
+            """
+        }
+    }
+
+    withEnv(["SNYK_TOKEN=${credentials('SNYK_TOKEN')}"]) {
+        stage('Snyk Test') {
+            snykSecurity failOnIssues: true
+        }
+    }
+
+    // Espera el resultado de SonarQube
+    timeout(time: 5, unit: 'MINUTES') {
+        waitForQualityGate(abortPipeline: false)
+    }
+
+    // Verifica el estado del Quality Gate
+    def qualityGateResult = waitForQualityGate()
+    return qualityGateResult.status == 'OK' ? 'OK' : 'FAILED'
+}

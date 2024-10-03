@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Página vulnerable a XSS</title>
+</head>
+<body>
+    <h1>Página vulnerable a XSS</h1>
+    <p>Ingrese su nombre:</p>
+    <input type="text" id="nombre">
+    <button onclick="saludar()">Saludar</button>
+    <p id="mensaje"></p>
+
+    <script>
+        function saludar() {
+            var nombre = document.getElementById("nombre").value;
+            document.getElementById("mensaje").innerHTML = "Hola, " + nombre + "!";
+        }
+    </script>
+</body>
+</html>
