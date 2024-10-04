@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Obtener Código Fuente') {
             steps{
-                git branch: 'example-rafa', poll: false, url: 'https://github.com/RafaelRamos93/1640-LOCAL-ORDER-ADMI.git'
+                git branch: 'example-rafa', poll: false, url: 'https://github.com/rpmorenos/1640-local-order-admi.git'
                 checkout scm
             }
         }
